@@ -1,0 +1,48 @@
+#!/bin/bash
+
+help() {
+    echo "usage: $0 <session name> <start|stop|restart> <command>"
+    exit 1
+}
+
+start_tmux() {
+    local sn="$1"
+    local swn="auto_run"
+    shift
+    local cmd="$@"
+    tmux new-session -d -s "$sn" -n "$swn"
+    tmux send-keys -t "$sn" "$cmd" C-m
+}
+
+stop_tmux() {
+    local sn="$1"
+    tmux has-session -t "$sn" &> /dev/null
+    if [ $? -eq 0 ]; then
+        tmux kill-session -t "$sn"
+    fi
+}
+
+if [ $# -lt 2 ]; then
+    help
+else
+    SESSIONNAME="$1"
+    ACT="$2"
+    shift
+    shift
+    CMD="$@"
+fi
+
+case "$ACT" in
+    start)
+        start_tmux $SESSIONNAME $CMD
+        ;;
+    stop)
+        stop_tmux $SESSIONNAME
+        ;;
+    restart)
+        stop_tmux $SESSIONNAME
+        start_tmux $SESSIONNAME $CMD
+        ;;
+    *)
+        help
+esac

@@ -1,0 +1,95 @@
+#!/bin/bash
+
+usage() {
+    echo "Usage: $0 -o <bootorder> -p <power> -b <bootdev> -c <qemu pid file> result_file"
+    exit 1
+}
+
+set_default_vals() {
+    if [ -f "$status_file" ]; then
+        if [ -z "$order" ]; then
+            order=$(awk -F': ' '/order/ {print $2}' $status_file)
+        fi
+        if [ -z "$power" ]; then
+            power=$(awk -F': ' '/power/ {print $2}' $status_file)
+        fi
+        if [ -z "$bootdev" ]; then
+            bootdev=$(awk -F': ' '/bootdev/ {print $2}' $status_file)
+        fi
+    else
+        order=${order:-nd}
+        power=${power:-off}
+        bootdev=${bootdev:-pxe}
+    fi
+    cmd_pidfile=${cmd_pidfile:-&{qemu_pidfile}}
+}
+
+enable_kvm() {
+    local support_kvm=$(cat /proc/cpuinfo | grep -E -c '(vmx|svm)')
+    if [ $support_kvm -eq 0 ]; then
+        echo ""
+    else
+        echo "--enable_kvm"
+    fi
+}
+
+gen_cmd() {
+    local order=$1
+    local power=$2
+    local bootdev=$3
+    local cmd_pidfile=$4
+    local disk=&{disk}
+    local qemu_program=&{qemu_program}
+    local memory=&{memory}
+    local ncpu=&{ncpu}
+    local ifup_script=&{ifup_script}
+    local ifdown_script=&{ifdown_script}
+    local ifmac=&{ifmac}
+    local listen_addr=&{listen_addr}
+    local ipmi_port=&{ipmi_port}
+    local telnet_port=&{telnet_port}
+    local vncport=&{vncport}
+
+    start_cmd="$qemu_program $(enable_kvm) -m $memory -smp $ncpu -boot $order -drive if=none,id=hd0,file=$disk -device virtio-scsi-pci,id=scsi0 -device scsi-hd,bus=scsi0.0,id=scsi0-0,drive=hd0 -netdev tap,id=network0,script=$ifup_script,downscript=$ifdown_script -device e1000,netdev=network0,mac=$ifmac -chardev socket,id=ipmi0,host=$listen_addr,port=$ipmi_port,reconnect=10 -device ipmi-bmc-extern,id=bmc0,chardev=ipmi0 -device isa-ipmi-bt,bmc=bmc0 -serial mon:telnet::$telnet_port,server,telnet,nowait -vnc :$vncport -daemonize --pidfile $cmd_pidfile"
+    if [ -f $status_file ]; then
+        sed -i "s@cmd: \(.*\)@cmd: $start_cmd@g" $status_file
+        sed -i "s@order: \(.*\)@order: $order@g" $status_file
+        sed -i "s@power: \(.*\)@power: $power@g" $status_file
+        sed -i "s@bootdev: \(.*\)@bootdev: $bootdev@g" $status_file
+    else
+        echo "cmd: $start_cmd" >> $status_file
+        echo "order: $order" >> $status_file
+        echo "power: $power" >> $status_file
+        echo "bootdev: $bootdev" >> $status_file
+    fi
+}
+
+while getopts ":o:p:b:c:" ags; do
+    case "${ags}" in
+        o)
+            order=${OPTARG}
+            ;;
+        p)
+            power=${OPTARG}
+            ;;
+        b)
+            bootdev=${OPTARG}
+            ;;
+        c)
+            cmd_pidfile=${OPTARG}
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [ $# == 0 ]; then
+    usage
+fi
+
+status_file=${1:-&{status_file}}
+set_default_vals
+
+gen_cmd $order $power $bootdev $cmd_pidfile

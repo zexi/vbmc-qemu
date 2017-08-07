@@ -1,0 +1,14 @@
+#!/bin/bash
+
+switch=&{bridge}
+echo "Executing $0"
+
+if [ -n "$1" ]; then
+    ip link set $1 down
+	brctl delif ${switch} $1
+    ip link delete dev $1
+    exit 0
+else
+    echo "Error: no interface specified"
+    exit 1
+fi

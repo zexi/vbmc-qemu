@@ -1,0 +1,5 @@
+peewee==2.8.5
+portpicker==1.1.1
+colorlog==2.7.0
+tabulate==0.7.5
+netifaces

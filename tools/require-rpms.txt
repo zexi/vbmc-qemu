@@ -1,0 +1,7 @@
+git
+bridge-utils
+gcc gcc-c++ make openssl-devel
+gtk2-devel
+popt-devel
+ncurses-devel
+tmux ipmitool
