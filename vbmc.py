@@ -15,12 +15,6 @@ if __name__ == '__main__':
             LOG.setLevel(logging.DEBUG)
             LOG.info('ARGS: {}'.format(args))
         args.func(args)
-        #if args.number > 0:
-        #    manager.create(args)
-        #elif args.start_bmc:
-        #    manager.start(args)
-        #else:
-        #    get_parser().print_help()
 
     except SystemExit as e:
         if e.code != 0:
