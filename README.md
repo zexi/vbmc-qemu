@@ -96,5 +96,5 @@ $ ipmitool -I lanplus -H 10.0.2.1 -p 9000 -U root -P test power on|off
 $ ipmitool -I lanplus -H 10.0.2.1 -p 9000 -U root -P test power status
 
 # Set the boot device to network, hd or cdrom
-$ ipmitool -I lanplus -U admin -P password -H 127.0.0.1 chassis bootdev pxe|disk|cdrom
+$ ipmitool -I lanplus -H 10.0.2.1 -p 9000 -U root -P test -H 127.0.0.1 chassis bootdev pxe|disk|cdrom
 ```
