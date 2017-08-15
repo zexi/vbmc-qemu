@@ -29,7 +29,7 @@ enable_kvm() {
     if [ $support_kvm -eq 0 ]; then
         echo ""
     else
-        echo "--enable_kvm"
+        echo "--enable-kvm"
     fi
 }
 
