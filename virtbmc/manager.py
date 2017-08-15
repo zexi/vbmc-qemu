@@ -12,6 +12,12 @@ from virtbmc.template import gen_template_content
 from virtbmc.clrlog import LOG
 import virtbmc.utils as utils
 import virtbmc.config as config
+from virtbmc import procutils
+
+
+RUNNING_STATUS = 'running'
+STOP_STATUS = 'stop'
+ERROR_STATUS = 'error'
 
 
 class QemuBMCUnit(object):
@@ -100,7 +106,6 @@ class QemuBMCUnit(object):
         utils.cpto(tmux_cmd, self.path_prefix)
 
     def gen_all_scripts(self, temdir):
-        # try:
         self.gen_bmc_env('{}/{}'.format(temdir, 'gen-bmc-env.tem'))
         self.gen_qemu_ifup('{}/{}'.format(temdir, 'qemu-ifup.tem'))
         self.gen_qemu_ifdown('{}/{}'.format(temdir, 'qemu-ifdown.tem'))
@@ -109,9 +114,6 @@ class QemuBMCUnit(object):
         self.gen_ipmi_config('{}/{}'.format(temdir, 'lan.conf.tem'))
         self.gen_controller_script('{}/{}'.format(temdir, 'controller.tem'),
                               '{}/{}'.format(temdir, 'tmux-cmd'))
-        # except Exception, e:
-            # LOG.error(e)
-            # utils.rmdirs(self.path_prefix)
 
     def create_qemu_image(self):
         utils.mkdir_of_file(self.disk)
@@ -127,12 +129,20 @@ class QemuBMCUnit(object):
             LOG.warning('BMC: {} already started.'.format(self.qemuname))
 
     def run_vm(self):
-        if not self.is_vm_running():
-            cmd = [self.controller_script, 'startvm', self.ipmiusr, self.ipmipass]
-            utils.run_cmd(cmd)
-            LOG.info('Starting VM: {} DONE.'.format(self.qemuname))
-        else:
-            LOG.warning('VM: {} already started.'.format(self.qemuname))
+        try:
+            if not self.is_vm_running():
+                cmd = [self.controller_script, 'startvm', self.ipmiusr, self.ipmipass]
+                utils.run_cmd(cmd)
+                LOG.info('Starting VM: {} DONE.'.format(self.qemuname))
+            else:
+                LOG.warning('VM: {} already started.'.format(self.qemuname))
+        except Exception as e:
+            LOG.error("Run VM error: {}".format(e))
+
+    def kill_qemu_by_pid(self):
+        with open(self.qemu_pidfile, 'r') as f:
+            pid = f.read().strip()
+            procutils.check_call_no_exception(['kill', '-9', pid])
 
     def get_vm_status_byfile(self):
         import re
@@ -153,34 +163,37 @@ class QemuBMCUnit(object):
 
     def get_vm_status(self):
         if not os.path.exists(self.status_file):
-            status = 'stop'
+            status = STOP_STATUS
         else:
             if self.get_vm_status_byfile().get('power', 'off') == 'off':
-                status = 'stop'
+                status = STOP_STATUS
             else:
                 cmd = 'ipmitool -I lanplus -U {} -P {} -H {} -p {} chassis power status'.format(self.ipmiusr, self.ipmipass,
                                                                                                 self.listen_addr, self.ipmi_port).split()
-                output = utils.run_cmd(cmd)
-                if 'Power is on' in output:
-                    status = 'running'
-                else:
-                    status = 'stop'
+                try:
+                    output = utils.run_cmd(cmd)
+                    if 'Power is on' in output:
+                        status = RUNNING_STATUS
+                    else:
+                        status = STOP_STATUS
+                except:
+                    status = ERROR_STATUS
         return status
 
     def get_bmc_status(self):
         if utils.is_port_open(self.ipmi_port):
-            return 'running'
+            return RUNNING_STATUS
         else:
-            return 'stop'
+            return STOP_STATUS
 
     def is_vm_running(self):
-            if self.get_vm_status() == 'running':
+            if self.get_vm_status() == RUNNING_STATUS:
                 return True
             else:
                 return False
 
     def is_bmc_running(self):
-        if self.get_bmc_status() == 'running':
+        if self.get_bmc_status() == RUNNING_STATUS:
             return True
         else:
             return False
@@ -190,6 +203,8 @@ class QemuBMCUnit(object):
             cmd = [self.controller_script, 'stopvm', self.ipmiusr, self.ipmipass]
             utils.run_cmd(cmd)
             LOG.info('Stop VM: {} DONE.'.format(self.qemuname))
+        if self.get_vm_status() == ERROR_STATUS:
+            self.kill_qemu_by_pid()
         else:
             LOG.warning('VM: {} already stopped.'.format(self.qemuname))
 
@@ -214,27 +229,25 @@ class QemuBMCUnit(object):
         utils.rmdirs(self.path_prefix)
 
 
-    list_headers = ['UUID', 'number', 'Tmux Session',
-                    'Listen Ip', 'Listen Port', 'Vm MAC',
-                    'IPMI User', 'IPMI Password',
-                    'BMC status', 'VM Status']
+    list_headers = ['Order', 'UUID', 'TmuxSession',
+                    'ListenIp', 'IPMIPort', 'VncPort', 'VmMAC',
+                    'IPMIUser', 'IPMIPassword', 'BMCStatus',
+                    'VMStatus', 'BootDev']
 
     def get_list_field(self):
         return [
-            self.uuid,
             self.number,
+            self.uuid,
             self.tmux_name,
             self.listen_addr,
-            'ipmi:{} vnc:{}'.format(
-                self.ipmi_port, 5900+self.vncport),
+            self.ipmi_port,
+            5900+self.vncport,
             self.ifmac,
             self.ipmiusr,
             self.ipmipass,
             self.get_bmc_status(),
-            '{} {}'.format(
-                self.get_vm_status(),
-                self.get_vm_status_byfile()['bootdev']
-            )
+            self.get_vm_status(),
+            self.get_vm_status_byfile()['bootdev'],
         ]
 
 BMC_FREE_PORT = utils.get_free_port(9000, 9500)
@@ -278,11 +291,11 @@ def gen_config(args, num):
 def get_QemuBMC_unit(_uuid, **kwargs):
     vbmc = VirtBMC.get(VirtBMC.uuid == _uuid)
     vm = QemuVM.get(QemuVM.uuid == _uuid)
-    if kwargs.get('ipmi_user', False) and vbmc.ipmiusr != kwargs.ipmi_user:
-        vbmc.ipmiusr = kwargs.ipmi_user
+    if kwargs.get('ipmi_user', False) and vbmc.ipmiusr != kwargs['ipmi_user']:
+        vbmc.ipmiusr = kwargs['ipmi_user']
         vbmc.save()
-    if kwargs.get('ipmi_password', False) and vbmc.ipmipass != kwargs.ipmi_password:
-        vbmc.ipmipass = kwargs.ipmi_password
+    if kwargs.get('ipmi_password', False) and vbmc.ipmipass != kwargs['ipmi_password']:
+        vbmc.ipmipass = kwargs['ipmi_password']
         vbmc.save()
     res = vbmc.__dict__['_data'].copy()
     res.update(vm.__dict__['_data'])
@@ -324,15 +337,27 @@ def create(args):
     process_map(lambda _: _create(args, lock), range(0, args.number))
 
 
+def extract_ipmi_user_passwd(args):
+    ret = {}
+    if args.ipmi_user:
+        ret['ipmi_user'] = args.ipmi_user
+    if args.ipmi_password:
+        ret['ipmi_password'] = args.ipmi_password
+    return ret
+
+
 def list_all(args):
     uuids = [bmc.uuid for bmc in VirtBMC.select().order_by(VirtBMC.number)]
+    print_table(uuids, args.json)
+
+def print_table(ids, json_output):
     data_series = []
 
-    for _uuid in uuids:
+    for _uuid in ids:
         unit_item, _, _ = get_QemuBMC_unit(_uuid)
         data_series.append(unit_item.get_list_field())
 
-    if args.json:
+    if json_output:
         import json
         output = [dict(zip(QemuBMCUnit.list_headers, item)) for item in data_series]
         output = json.dumps(output, indent=4)
@@ -340,6 +365,21 @@ def list_all(args):
         output = tabulate(data_series, QemuBMCUnit.list_headers,
                       tablefmt="psql")
     print(output)
+
+
+def update(args):
+
+    def _update(uuid):
+        kwargs = extract_ipmi_user_passwd(args)
+        unit_item, _, _ = get_QemuBMC_unit(uuid, **kwargs)
+
+    if args.id[0] == 'all':
+        update_list = [item.uuid for item in VirtBMC.select()]
+    else:
+        update_list = args.id
+
+    process_map(_update, update_list)
+    print_table(update_list, args.json)
 
 
 def delete(args):

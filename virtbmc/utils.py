@@ -104,7 +104,9 @@ def run_cmd(cmd):
     except Exception as e:
         if hasattr(cmd, '__iter__'):
             cmd = ' '.join(cmd)
-        LOG.error("Run command: {}\nError: {}".format(cmd, e))
+        e = Exception("Run command: '{}'\nError: {}".format(cmd, e))
+        LOG.error(e)
+        raise e
 
 
 def ranges(num_lst):

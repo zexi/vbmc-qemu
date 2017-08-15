@@ -60,6 +60,9 @@ $ ./vbmc.py start all --autostart-vm
 
 # Delete all or <id>
 $ ./vbmc.py delete all
+
+# Update all or <id>
+$ ./vbmc.py update all -u <ipmi_user> -p <ipmi_password>
 ```
 
 ### check background qemu process
@@ -76,16 +79,18 @@ root      48660 10.2  0.9 5956108 37312 ?       Sl   00:58   0:15 /opt/qemu2.7/b
 $ ./vbmc.py list --json
 [
     {
-        "Listen Ip": "10.0.2.1",
-        "VM Status": "running pxe",
+        "ListenIp": "10.0.2.1",
+        "VMStatus": "running",
+	"BootDev": "pxe",
         "UUID": "bf83a2ed-1028-4742-ab7d-212b9583885e",
-        "Listen Port": "ipmi:9000 vnc:5900",
-        "BMC status": "running",
-        "number": 0,
-        "Tmux Session": "vbmc-0--bf83a2ed",
-        "Vm MAC": "00:16:3e:6d:9b:1f",
-        "IPMI User": "root",
-        "IPMI Password": "test"
+        "VncPort": 5900,
+	"IPMIPort": 9000,
+        "BMCstatus": "running",
+        "Order": 0,
+        "TmuxSession": "vbmc-0--bf83a2ed",
+        "VmMAC": "00:16:3e:6d:9b:1f",
+        "IPMIUser": "root",
+        "IPMIPassword": "test"
     }
 ]
 

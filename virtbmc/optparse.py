@@ -64,7 +64,7 @@ def init_argparser():
     )
     start_parser.add_argument("bmc", nargs='+',
                         help="start BMC, default start all")
-    start_parser.add_argument("--autostart-vm",
+    start_parser.add_argument("--vm", dest='autostart_vm',
                         help="autostart qemu vm when BMC run",
                         action="store_true")
     start_parser.set_defaults(func=manager.start)
@@ -78,6 +78,18 @@ def init_argparser():
                         action="store_true")
     list_parser.set_defaults(func=manager.list_all)
 
+    # Update
+    update_parser = subparsers.add_parser(
+        'update', parents=[parent_parser],
+        help='Update VMs',
+    )
+    update_parser.add_argument('id', nargs='+',
+                               help='Update specify BMCs')
+    update_parser.add_argument("-u", "--ipmi-user", help="ipmi user")
+    update_parser.add_argument("-p", "--ipmi-password", help="ipmi password")
+    update_parser.add_argument("--json", help="json output",
+                        action="store_true")
+    update_parser.set_defaults(func=manager.update)
 
     # Delete
     delete_parser = subparsers.add_parser(
@@ -96,9 +108,6 @@ def init_argparser():
     stop_parser.add_argument("id", nargs='+',
                         help="stop specify BMCs & Vms")
     stop_parser.set_defaults(func=manager.stop)
-
-    parser.add_argument("-u", "--ipmi-user", help="ipmi user")
-    parser.add_argument("-p", "--ipmi-password", help="ipmi password")
 
     return parser
 
