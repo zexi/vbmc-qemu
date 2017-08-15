@@ -172,7 +172,7 @@ class QemuBMCUnit(object):
                                                                                                 self.listen_addr, self.ipmi_port).split()
                 try:
                     output = utils.run_cmd(cmd)
-                    if 'Power is on' in output:
+                    if 'Power is on' in ''.join(output):
                         status = RUNNING_STATUS
                     else:
                         status = STOP_STATUS
@@ -203,8 +203,10 @@ class QemuBMCUnit(object):
             cmd = [self.controller_script, 'stopvm', self.ipmiusr, self.ipmipass]
             utils.run_cmd(cmd)
             LOG.info('Stop VM: {} DONE.'.format(self.qemuname))
-        if self.get_vm_status() == ERROR_STATUS:
-            self.kill_qemu_by_pid()
+        if os.path.exists(self.qemu_pidfile):
+            if self.get_vm_status() == ERROR_STATUS or procutils.check_pid_alive(self.qemu_pidfile, 'qemu'):
+                self.kill_qemu_by_pid()
+                LOG.warning("VM: {} be killed".format(self.qemuname))
         else:
             LOG.warning('VM: {} already stopped.'.format(self.qemuname))
 
@@ -249,6 +251,7 @@ class QemuBMCUnit(object):
             self.get_vm_status(),
             self.get_vm_status_byfile()['bootdev'],
         ]
+
 
 BMC_FREE_PORT = utils.get_free_port(9000, 9500)
 VNC_FREE_PORT = utils.get_free_port(5900, 6000)

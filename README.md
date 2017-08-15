@@ -56,7 +56,7 @@ $ ./vbmc.py create -n 1
 $ ./vbmc.py list
 
 # Start all or <id>
-$ ./vbmc.py start all --autostart-vm
+$ ./vbmc.py start all --vm
 
 # Delete all or <id>
 $ ./vbmc.py delete all

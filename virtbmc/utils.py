@@ -97,14 +97,16 @@ def make_executable(path):
 
 
 def run_cmd(cmd):
+    if hasattr(cmd, '__iter__'):
+        cmdstr = ' '.join(cmd)
+    else:
+        cmdstr = cmd
     try:
-        LOG.info("Run command: %s" % cmd)
+        LOG.info("Run command: %s" % cmdstr)
         res = procutils.check_output(cmd)
         return res
     except Exception as e:
-        if hasattr(cmd, '__iter__'):
-            cmd = ' '.join(cmd)
-        e = Exception("Run command: '{}'\nError: {}".format(cmd, e))
+        e = Exception("Run command: '{}'\nError: {}".format(cmdstr, e))
         LOG.error(e)
         raise e
 

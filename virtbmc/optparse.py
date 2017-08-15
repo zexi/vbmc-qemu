@@ -39,6 +39,8 @@ def init_argparser():
         'create', parents=[parent_parser],
         help='Create VMs with BMC',
     )
+    create_parser.add_argument("-u", "--ipmi-user", help="ipmi user")
+    create_parser.add_argument("-p", "--ipmi-password", help="ipmi password")
     create_parser.add_argument("-n", "--number", type=int, default=0,
                         help="start virtual qemu bmc of a given number")
     create_parser.add_argument("--image-size", type=str, dest='image_size',
