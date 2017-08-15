@@ -9,6 +9,8 @@ from netifaces import AF_INET, AF_LINK
 
 from portpicker import is_port_free
 
+from virtbmc.clrlog import LOG
+from virtbmc import procutils
 
 def get_netiface_config(iface):
     if iface not in netifaces.interfaces():
@@ -94,18 +96,15 @@ def make_executable(path):
     os.chmod(path, st.st_mode | stat.S_IEXEC)
 
 
-def run_cmd(cmd, shell=False):
-    from virtbmc.clrlog import LOG
+def run_cmd(cmd):
     try:
         LOG.info("Run command: %s" % cmd)
-        res = subprocess.check_output(
-            cmd, stderr=subprocess.STDOUT, shell=shell)
+        res = procutils.check_output(cmd)
         return res
-    except subprocess.CalledProcessError, ex:
-        LOG.error(
-            "FAIL: Run command: %s"
-            "message: %s\nreturn: %s\noutput: %s\n"
-            % (ex.cmd, ex.message, ex.returncode, ex.output))
+    except Exception as e:
+        if hasattr(cmd, '__iter__'):
+            cmd = ' '.join(cmd)
+        LOG.error("Run command: {}\nError: {}".format(cmd, e))
 
 
 def ranges(num_lst):
